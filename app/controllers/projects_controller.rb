@@ -3,15 +3,7 @@ class ProjectsController < ApplicationController
   # Отключил проверку CSRF токена для удобства
 
   def index
-    result = []
-    all_todos = Todo.all
-    Project.find_each do |project|
-      todos = all_todos.where(project_id: project.id).order(:text)
-      result.append(
-        forming_json_project(project.id, project.title, todos)
-      )
-    end
-    render json: result, status: 200
+    render json: Project.all.as_json(include: :todos), status: 200
   end
 
   def update
@@ -43,14 +35,6 @@ class ProjectsController < ApplicationController
     }
   end
 
-  private def forming_json_project(id, title, todos)
-    {
-      "id" => id,
-      "title" => title,
-      "todos" => todos.as_json
-    }
-  end
-
   private def create_new_project
     new_project = Project.new(title: params[:title])
     if new_project.valid?
@@ -59,7 +43,7 @@ class ProjectsController < ApplicationController
       render json: create_message("Project #{params[:title]} wasn't created.", new_project.errors.as_json), status: 400
       return
     end
-    create_todo(new_project, true)
+    create_todo(new_project)
   end
 
   private def add_task_to_exist_project
@@ -69,22 +53,18 @@ class ProjectsController < ApplicationController
       render json: create_message("Project with id #{params[:project_id]} doesn't exist.", nil), status: 400
       return
     end
-
     create_todo(project)
   end
 
-  private def create_todo(project, is_new_project=false)
+  private def create_todo(project)
     new_todo = Todo.new(text: params[:text], isCompleted: params[:isCompleted], project: project)
     if new_todo.valid?
       new_todo.save
-      if is_new_project
-        render json: forming_json_project(project.id, project.title, new_todo), status: 201
-      else
-        todos = Todo.where(project_id: project.id).order(:text)
-        render json: forming_json_project(project.id, project.title, todos), status: 201
-      end
+      result = Project.find(project.id).as_json(include: :todos)
+      render json: result, status: 201
     else
       render json: create_message("Task #{params[:text]} wasn't created.", new_todo.errors.as_json), status: 400
     end
   end
+
 end
